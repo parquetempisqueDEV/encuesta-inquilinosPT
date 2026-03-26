@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard – Encuesta Parque Tempisque</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet" />
+  <style>
+    body { background: #f0fdf4; font-family: 'Segoe UI', system-ui, sans-serif; }
+    .card { background: white; border-radius: 14px; box-shadow: 0 2px 12px rgba(0,0,0,.07); }
+    .kpi-card { border-left: 4px solid #16a34a; }
+    .fade-in { animation: fadeIn .3s ease; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(6px) } to { opacity:1; transform:translateY(0) } }
+    .nps-promotor  { background:#dcfce7; color:#15803d; }
+    .nps-neutro    { background:#fef9c3; color:#854d0e; }
+    .nps-detractor { background:#fee2e2; color:#b91c1c; }
+    table { border-collapse: collapse; width: 100%; }
+    th { background: #f0fdf4; color: #15803d; font-weight: 700; text-align: left; padding: 10px 12px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+    td { padding: 9px 12px; font-size: 13px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f0fdf4; }
+    .star { color: #eab308; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-thumb { background: #bbf7d0; border-radius: 3px; }
+  </style>
+</head>
+<body class="min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+    const { createClient } = supabase;
+
+    const SUPABASE_URL = 'https://vcdgurkuoqsdvwvpnevr.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZjZGd1cmt1b3FzZHZ3dnBuZXZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MjYxNDQsImV4cCI6MjA4ODMwMjE0NH0._fC7LXnggqXyniyOAb2orZj-QHY1_Xrf_-FnKVju9S8';
+    const ADMIN_PASSWORD = 'TempisqueAdmin2026'; // ← Cambie esta contraseña
+
+    const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const PREGUNTAS = [
+      { key: 'p1_espacio',              short: 'P1 – Espacio',        label: '🏢 Funcionalidad del espacio' },
+      { key: 'p2_areas_comunes',        short: 'P2 – Áreas Comunes',  label: '🚪 Áreas internas comunes' },
+      { key: 'p3_precio_alquiler',      short: 'P3 – Precio',         label: '💰 Precio del alquiler' },
+      { key: 'p4_areas_verdes',         short: 'P4 – Áreas Verdes',   label: '🌿 Áreas externas' },
+      { key: 'p5_mantenimiento',        short: 'P5 – Mantenimiento',  label: '🔧 Mantenimiento' },
+      { key: 'p6_seguridad',            short: 'P6 – Seguridad',      label: '🔒 Seguridad' },
+      { key: 'p7_comunicacion',         short: 'P7 – Comunicación',   label: '📞 Comunicación administrativa' },
+      { key: 'p8_satisfaccion_general', short: 'P8 – Satisfacción',   label: '⭐ Satisfacción general' },
+    ];
+
+    const avg = (arr, key) => {
+      const vals = arr.map(r => r[key]).filter(v => v !== null && v !== undefined);
+      return vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length) : null;
+    };
+
+    const pct = (n, total) => total ? Math.round((n / total) * 100) : 0;
+
+    const stars = (v) => {
+      if (v === null) return '–';
+      return '★'.repeat(Math.round(v)) + '☆'.repeat(5 - Math.round(v));
+    };
+
+    // ── Chart: Bar ───────────────────────────────────────────
+    function BarChart({ data, labels, colors }) {
+      const ref = useRef(null);
+      useEffect(() => {
+        const ctx = ref.current.getContext('2d');
+        const chart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels,
+            datasets: [{ data, backgroundColor: colors || '#16a34a', borderRadius: 6, borderSkipped: false }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: { min: 0, max: 5, ticks: { stepSize: 1 }, grid: { color: '#f3f4f6' } },
+              x: { grid: { display: false }, ticks: { font: { size: 11 } } }
+            }
+          }
+        });
+        return () => chart.destroy();
+      }, [JSON.stringify(data)]);
+      return <canvas ref={ref} />;
+    }
+
+    // ── Chart: NPS Doughnut ──────────────────────────────────
+    function NpsDonut({ promotores, neutros, detractores }) {
+      const ref = useRef(null);
+      useEffect(() => {
+        const ctx = ref.current.getContext('2d');
+        const chart = new Chart(ctx, {
+          type: 'doughnut',
+          data: {
+            labels: ['Promotores (9–10)', 'Neutros (7–8)', 'Detractores (0–6)'],
+            datasets: [{ data: [promotores, neutros, detractores], backgroundColor: ['#16a34a','#eab308','#ef4444'], borderWidth: 2 }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { font: { size: 12 } } } },
+            cutout: '65%'
+          }
+        });
+        return () => chart.destroy();
+      }, [promotores, neutros, detractores]);
+      return <canvas ref={ref} />;
+    }
+
+    // ── Chart: Distribución Likert ───────────────────────────
+    function LikertDistChart({ rows }) {
+      const ref = useRef(null);
+      useEffect(() => {
+        const counts = [1,2,3,4,5].map(v =>
+          PREGUNTAS.map(p => rows.filter(r => r[p.key] === v).length)
+        );
+        const ctx = ref.current.getContext('2d');
+        const chart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: PREGUNTAS.map(p => p.short),
+            datasets: [
+              { label: '1 – Muy en desacuerdo', data: counts[0], backgroundColor: '#ef4444', borderRadius: 3 },
+              { label: '2 – En desacuerdo',     data: counts[1], backgroundColor: '#f97316', borderRadius: 3 },
+              { label: '3 – Neutral',            data: counts[2], backgroundColor: '#eab308', borderRadius: 3 },
+              { label: '4 – De acuerdo',         data: counts[3], backgroundColor: '#84cc16', borderRadius: 3 },
+              { label: '5 – De acuerdo',         data: counts[4], backgroundColor: '#16a34a', borderRadius: 3 },
+            ]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12 } } },
+            scales: {
+              x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } } },
+              y: { stacked: true, grid: { color: '#f3f4f6' } }
+            }
+          }
+        });
+        return () => chart.destroy();
+      }, [rows.length]);
+      return <canvas ref={ref} />;
+    }
+
+    // ── Login ────────────────────────────────────────────────
+    function Login({ onLogin }) {
+      const [pw, setPw] = useState('');
+      const [err, setErr] = useState(false);
+      const submit = () => {
+        if (pw === ADMIN_PASSWORD) { onLogin(); }
+        else { setErr(true); setTimeout(() => setErr(false), 2000); }
+      };
+      return (
+        <div className="min-h-screen flex items-center justify-center px-4">
+          <div className="card p-8 w-full max-w-sm text-center">
+            <div className="text-5xl mb-4">🌿</div>
+            <h1 className="text-xl font-bold text-green-900 mb-1">Parque Tempisque</h1>
+            <p className="text-sm text-gray-500 mb-6">Panel de Administrador – Encuesta</p>
+            <input
+              type="password" value={pw} onChange={e => setPw(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && submit()}
+              placeholder="Contraseña"
+              className={`w-full border-2 rounded-xl px-4 py-3 mb-3 focus:outline-none text-center transition
+                ${err ? 'border-red-400 shake' : 'border-gray-200 focus:border-green-500'}`}
+            />
+            {err && <p className="text-red-500 text-sm mb-2">Contraseña incorrecta</p>}
+            <button onClick={submit} className="w-full py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition">
+              Ingresar
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // ── KPI Card ─────────────────────────────────────────────
+    function KpiCard({ icon, title, value, sub, color }) {
+      return (
+        <div className={`card kpi-card p-5`} style={{ borderLeftColor: color || '#16a34a' }}>
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">{title}</p>
+              <p className="text-3xl font-bold text-gray-800">{value}</p>
+              {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
+            </div>
+            <span className="text-3xl">{icon}</span>
+          </div>
+        </div>
+      );
+    }
+
+    // ── Main Dashboard ───────────────────────────────────────
+    function Dashboard() {
+      const [rows, setRows]       = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [tab, setTab]         = useState('resumen');
+
+      const fetchData = async () => {
+        setLoading(true);
+        const { data } = await db.from('encuesta_satisfaccion').select('*').order('created_at', { ascending: false });
+        setRows(data || []);
+        setLoading(false);
+      };
+
+      useEffect(() => { fetchData(); }, []);
+
+      if (loading) return (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="text-4xl mb-3 animate-spin">🌿</div>
+            <p className="text-green-700 font-semibold">Cargando datos…</p>
+          </div>
+        </div>
+      );
+
+      const n = rows.length;
+
+      // KPIs
+      const globalAvg = n
+        ? PREGUNTAS.reduce((s, p) => s + (avg(rows, p.key) || 0), 0) / PREGUNTAS.length
+        : null;
+      const pct45 = n
+        ? Math.round(rows.filter(r => PREGUNTAS.every(p => r[p.key] >= 4)).length / n * 100)
+        : null;
+      const npsAvg = avg(rows, 'p9_nps');
+      const promotores  = rows.filter(r => r.p9_nps >= 9).length;
+      const neutros     = rows.filter(r => r.p9_nps >= 7 && r.p9_nps <= 8).length;
+      const detractores = rows.filter(r => r.p9_nps !== null && r.p9_nps <= 6).length;
+      const npsScore    = n ? Math.round(pct(promotores, n) - pct(detractores, n)) : null;
+
+      // Chart data
+      const avgsByQ = PREGUNTAS.map(p => avg(rows, p.key) || 0);
+      const qLabels  = PREGUNTAS.map(p => p.short.split('–')[1].trim());
+
+      return (
+        <div className="min-h-screen">
+          {/* Header */}
+          <div className="bg-green-800 text-white px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🌿</span>
+              <div>
+                <h1 className="font-bold text-lg leading-tight">Parque Tempisque</h1>
+                <p className="text-green-300 text-xs">Dashboard · Encuesta de Satisfacción</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-green-300 text-sm">{n} respuesta{n !== 1 ? 's' : ''}</span>
+              <button onClick={fetchData} className="bg-green-700 hover:bg-green-600 text-white text-xs px-3 py-1.5 rounded-lg transition">
+                ↻ Actualizar
+              </button>
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <div className="bg-white border-b border-gray-100 px-6">
+            <div className="flex gap-1">
+              {[['resumen','📊 Resumen'],['preguntas','📋 Preguntas'],['servicios','📦 Servicios'],['respuestas','📝 Respuestas']].map(([id, label]) => (
+                <button key={id} onClick={() => setTab(id)}
+                  className={`px-4 py-3 text-sm font-semibold border-b-2 transition
+                    ${tab === id ? 'border-green-600 text-green-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="p-6 max-w-6xl mx-auto">
+
+            {/* ── TAB: RESUMEN ── */}
+            {tab === 'resumen' && (
+              <div className="fade-in">
+                {n === 0 ? (
+                  <div className="text-center py-20 text-gray-400">
+                    <div className="text-5xl mb-4">📭</div>
+                    <p className="text-lg font-semibold">Aún no hay respuestas registradas</p>
+                    <p className="text-sm mt-2">Comparte el enlace de la encuesta con los inquilinos.</p>
+                  </div>
+                ) : (
+                  <>
+                    {/* KPIs */}
+                    <div className="grid grid-cols-2 gap-4 mb-6" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+                      <KpiCard icon="📋" title="Total Respuestas" value={n} />
+                      <KpiCard icon="⭐" title="Promedio Global" value={globalAvg ? globalAvg.toFixed(2) : '–'} sub="Escala 1–5" color="#eab308" />
+                      <KpiCard icon="😊" title="Satisfacción ≥4" value={pct45 !== null ? pct45 + '%' : '–'} sub="% con todas ≥4" color="#84cc16" />
+                      <KpiCard icon="📢" title="NPS Score" value={npsScore !== null ? (npsScore > 0 ? '+' : '') + npsScore : '–'} sub={`Prom. ${npsAvg ? npsAvg.toFixed(1) : '–'}/10`} color={npsScore >= 50 ? '#16a34a' : npsScore >= 0 ? '#eab308' : '#ef4444'} />
+                    </div>
+
+                    {/* Promedios por pregunta */}
+                    <div className="grid grid-cols-1 gap-6 mb-6" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
+                      <div className="card p-5">
+                        <h3 className="font-bold text-gray-700 mb-4">Promedio por pregunta</h3>
+                        <div style={{ height: 220 }}>
+                          <BarChart data={avgsByQ} labels={qLabels} />
+                        </div>
+                      </div>
+                      <div className="card p-5">
+                        <h3 className="font-bold text-gray-700 mb-4">NPS · Distribución</h3>
+                        <div className="flex gap-3 mb-3 justify-center text-sm">
+                          <span className="nps-promotor px-3 py-1 rounded-full font-semibold">Promotores: {promotores}</span>
+                          <span className="nps-neutro px-3 py-1 rounded-full font-semibold">Neutros: {neutros}</span>
+                          <span className="nps-detractor px-3 py-1 rounded-full font-semibold">Detractores: {detractores}</span>
+                        </div>
+                        <div style={{ height: 180 }}>
+                          <NpsDonut promotores={promotores} neutros={neutros} detractores={detractores} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Distribución Likert */}
+                    <div className="card p-5">
+                      <h3 className="font-bold text-gray-700 mb-4">Distribución de respuestas por pregunta</h3>
+                      <div style={{ height: 260 }}>
+                        <LikertDistChart rows={rows} />
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* ── TAB: PREGUNTAS ── */}
+            {tab === 'preguntas' && (
+              <div className="fade-in">
+                <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
+                  {PREGUNTAS.map(p => {
+                    const a = avg(rows, p.key);
+                    const dist = [1,2,3,4,5].map(v => rows.filter(r => r[p.key] === v).length);
+                    const total = dist.reduce((a,b) => a+b, 0);
+                    return (
+                      <div key={p.key} className="card p-5">
+                        <p className="font-semibold text-gray-700 text-sm mb-1">{p.label}</p>
+                        <div className="flex items-end gap-2 mb-3">
+                          <span className="text-3xl font-bold text-green-700">{a ? a.toFixed(2) : '–'}</span>
+                          <span className="text-sm text-gray-400 mb-1">/ 5 · {total} resp.</span>
+                        </div>
+                        {/* Mini bar */}
+                        <div className="flex gap-1 h-10 items-end">
+                          {dist.map((c, i) => {
+                            const colors = ['#ef4444','#f97316','#eab308','#84cc16','#16a34a'];
+                            const h = total ? Math.max((c/total)*100, c>0?8:0) : 0;
+                            return (
+                              <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
+                                <span className="text-xs text-gray-400">{c}</span>
+                                <div style={{ height: h+'%', minHeight: c>0?6:0, background: colors[i], borderRadius: '3px 3px 0 0', width:'100%' }} />
+                                <span className="text-xs text-gray-400">{i+1}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className="mt-2 text-xs text-gray-400 text-right">
+                          % acuerdo (4–5): <span className="font-bold text-green-600">{total ? Math.round((dist[3]+dist[4])/total*100) : 0}%</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ── TAB: SERVICIOS ── */}
+            {tab === 'servicios' && (
+              <div className="fade-in grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
+                {[
+                  { key: 'serv_limpieza', notaKey: 'serv_limpieza_nota', label: '🧹 Servicio de Limpieza' },
+                  { key: 'serv_internet', notaKey: 'serv_internet_nota', label: '📶 Internet y Wi-Fi' },
+                ].map(s => {
+                  const si  = rows.filter(r => r[s.key] === true).length;
+                  const no  = rows.filter(r => r[s.key] === false).length;
+                  const na  = rows.filter(r => r[s.key] === null).length;
+                  const a   = avg(rows.filter(r => r[s.key] === true), s.notaKey);
+                  const dist = [1,2,3,4,5].map(v => rows.filter(r => r[s.notaKey] === v).length);
+                  const total = dist.reduce((x,y) => x+y, 0);
+                  return (
+                    <div key={s.key} className="card p-6">
+                      <h3 className="font-bold text-gray-800 mb-4 text-base">{s.label}</h3>
+                      <div className="flex gap-4 mb-4">
+                        <div className="text-center">
+                          <p className="text-2xl font-bold text-green-700">{si}</p>
+                          <p className="text-xs text-gray-500">Sí lo tienen</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-2xl font-bold text-red-500">{no}</p>
+                          <p className="text-xs text-gray-500">No lo tienen</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-2xl font-bold text-gray-400">{pct(si, si+no)}%</p>
+                          <p className="text-xs text-gray-500">Adopción</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-2xl font-bold text-yellow-500">{a ? a.toFixed(1) : '–'}</p>
+                          <p className="text-xs text-gray-500">Calidad prom.</p>
+                        </div>
+                      </div>
+                      {si > 0 && (
+                        <div className="flex gap-1 h-10 items-end">
+                          {dist.map((c, i) => {
+                            const colors = ['#ef4444','#f97316','#eab308','#84cc16','#16a34a'];
+                            const h = total ? Math.max((c/total)*100, c>0?8:0) : 0;
+                            return (
+                              <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
+                                <span className="text-xs text-gray-400">{c || ''}</span>
+                                <div style={{ height: h+'%', minHeight: c>0?6:0, background: colors[i], borderRadius:'3px 3px 0 0', width:'100%' }} />
+                                <span className="text-xs text-gray-400">{i+1}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* ── TAB: RESPUESTAS ── */}
+            {tab === 'respuestas' && (
+              <div className="fade-in">
+                <div className="card overflow-auto">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Fecha</th>
+                        <th>Espacio</th>
+                        <th>Tiempo</th>
+                        {PREGUNTAS.map(p => <th key={p.key}>{p.short.split('–')[0]}</th>)}
+                        <th>Limpieza</th>
+                        <th>Internet</th>
+                        <th>NPS</th>
+                        <th>Comentarios</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.length === 0 && (
+                        <tr><td colSpan="99" className="text-center text-gray-400 py-8">Sin respuestas aún</td></tr>
+                      )}
+                      {rows.map(r => (
+                        <tr key={r.id}>
+                          <td className="whitespace-nowrap text-xs text-gray-500">
+                            {new Date(r.created_at).toLocaleDateString('es-CR', { day:'2-digit', month:'short', year:'2-digit' })}
+                          </td>
+                          <td className="whitespace-nowrap text-xs">{r.tipo_espacio || '–'}</td>
+                          <td className="whitespace-nowrap text-xs">{r.tiempo_inquilino || '–'}</td>
+                          {PREGUNTAS.map(p => (
+                            <td key={p.key} className="text-center font-bold" style={{
+                              color: r[p.key] >= 4 ? '#16a34a' : r[p.key] === 3 ? '#92400e' : r[p.key] ? '#dc2626' : '#9ca3af'
+                            }}>
+                              {r[p.key] || '–'}
+                            </td>
+                          ))}
+                          <td className="text-center text-xs">
+                            {r.serv_limpieza === null ? '–' : r.serv_limpieza ? `✓ ${r.serv_limpieza_nota || ''}` : '✗'}
+                          </td>
+                          <td className="text-center text-xs">
+                            {r.serv_internet === null ? '–' : r.serv_internet ? `✓ ${r.serv_internet_nota || ''}` : '✗'}
+                          </td>
+                          <td className="text-center font-bold" style={{
+                            color: r.p9_nps >= 9 ? '#16a34a' : r.p9_nps >= 7 ? '#92400e' : r.p9_nps !== null ? '#dc2626' : '#9ca3af'
+                          }}>
+                            {r.p9_nps !== null ? r.p9_nps : '–'}
+                          </td>
+                          <td className="text-xs max-w-xs truncate text-gray-500" title={r.comentarios || ''}>
+                            {r.comentarios || '–'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-xs text-gray-400 mt-3 text-right">{n} registro{n !== 1 ? 's' : ''} en total</p>
+              </div>
+            )}
+
+          </div>
+        </div>
+      );
+    }
+
+    // ── Root ─────────────────────────────────────────────────
+    function App() {
+      const [auth, setAuth] = useState(false);
+      if (!auth) return <Login onLogin={() => setAuth(true)} />;
+      return <Dashboard />;
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

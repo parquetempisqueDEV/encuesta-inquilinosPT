@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Encuesta de Satisfacción – Parque Tempisque</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet" />
+  <style>
+    :root { --green: #16a34a; --green-light: #dcfce7; --green-dark: #14532d; }
+    body { background: #f0fdf4; font-family: 'Segoe UI', system-ui, sans-serif; }
+    .btn-likert {
+      transition: all .15s ease;
+      cursor: pointer;
+      user-select: none;
+    }
+    .btn-likert:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(22,163,74,.25); }
+    .btn-likert.selected { background: #16a34a !important; color: white !important; border-color: #16a34a !important; }
+    .btn-nps { transition: all .12s ease; cursor: pointer; user-select: none; }
+    .btn-nps:hover { transform: scale(1.08); }
+    .btn-nps.selected { background: #16a34a !important; color: white !important; }
+    .progress-bar { transition: width .4s ease; }
+    .fade-in { animation: fadeIn .3s ease; }
+    @keyframes fadeIn { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform: translateY(0); } }
+    .toggle-yes.active { background: #16a34a; color: white; border-color: #16a34a; }
+    .toggle-no.active  { background: #dc2626; color: white; border-color: #dc2626; }
+    .card { background: white; border-radius: 16px; box-shadow: 0 2px 16px rgba(0,0,0,.07); }
+  </style>
+</head>
+<body class="min-h-screen py-6 px-4">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+    const { createClient } = supabase;
+
+    const SUPABASE_URL = 'https://vcdgurkuoqsdvwvpnevr.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZjZGd1cmt1b3FzZHZ3dnBuZXZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MjYxNDQsImV4cCI6MjA4ODMwMjE0NH0._fC7LXnggqXyniyOAb2orZj-QHY1_Xrf_-FnKVju9S8';
+    const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const LIKERT_LABELS = ['', 'Totalmente\nen desacuerdo', 'En desacuerdo', 'Neutral', 'De acuerdo', 'Totalmente\nde acuerdo'];
+    const LIKERT_COLORS = ['', '#ef4444', '#f97316', '#eab308', '#84cc16', '#16a34a'];
+    const SERVICE_LABELS = ['', 'Muy mala', 'Mala', 'Regular', 'Buena', 'Excelente'];
+
+    const PREGUNTAS = [
+      { key: 'p1_espacio',              label: '🏢 Mi espacio rentado es funcional para las necesidades de mi negocio.' },
+      { key: 'p2_areas_comunes',        label: '🚪 Las áreas internas comunes (pasillos, lobby, baños y parqueo) se mantienen limpias y accesibles.' },
+      { key: 'p3_precio_alquiler',      label: '💰 El precio del alquiler es justo en relación con las instalaciones.' },
+      { key: 'p4_areas_verdes',         label: '🌿 Las áreas externas comunes se mantienen limpias, ordenadas y con buen aspecto.' },
+      { key: 'p5_mantenimiento',        label: '🔧 El mantenimiento del parque es oportuno y resuelve los problemas eficientemente.' },
+      { key: 'p6_seguridad',            label: '🔒 Las medidas de seguridad del parque son adecuadas.' },
+      { key: 'p7_comunicacion',         label: '📞 La comunicación con el equipo administrativo es clara, oportuna y profesional.' },
+      { key: 'p8_satisfaccion_general', label: '⭐ En general, estoy satisfecho/a con mi experiencia como inquilino en Parque Tempisque.' },
+    ];
+
+    const TOTAL_STEPS = 5; // 1=Info 2=Satisfaccion 3=Servicios 4=NPS 5=Gracias
+
+    // ── Likert Button Group ──────────────────────────────────
+    function LikertGroup({ value, onChange }) {
+      return (
+        <div className="flex gap-2 flex-wrap justify-center mt-2">
+          {[1,2,3,4,5].map(n => (
+            <button
+              key={n}
+              type="button"
+              onClick={() => onChange(n)}
+              className={`btn-likert flex flex-col items-center justify-center w-14 h-14 rounded-xl border-2 text-sm font-bold
+                ${value === n ? 'selected' : 'border-gray-200 bg-white text-gray-500 hover:border-green-400'}`}
+              style={value === n ? {} : { borderColor: LIKERT_COLORS[n] + '44' }}
+              title={LIKERT_LABELS[n]}
+            >
+              <span className="text-lg leading-none">{n}</span>
+              <span className="text-xs leading-none mt-0.5 font-normal" style={{ fontSize: '9px', whiteSpace: 'pre', textAlign: 'center' }}>
+                {n === 1 ? 'Muy en\ndesac.' : n === 5 ? 'Muy de\nacuerdo' : n === 3 ? 'Neutral' : n === 2 ? 'En\ndesac.' : 'De\nacuerdo'}
+              </span>
+            </button>
+          ))}
+        </div>
+      );
+    }
+
+    // ── Service Rating ───────────────────────────────────────
+    function ServiceBlock({ label, active, onToggle, nota, onNota }) {
+      return (
+        <div className="border border-gray-100 rounded-xl p-4 mb-3 bg-gray-50">
+          <div className="flex items-center justify-between mb-3">
+            <span className="font-medium text-gray-700">{label}</span>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => onToggle(true)}
+                className={`toggle-yes px-4 py-1.5 rounded-full border-2 border-gray-200 text-sm font-semibold transition ${active === true ? 'active' : 'text-gray-500 hover:border-green-400'}`}>
+                Sí
+              </button>
+              <button type="button" onClick={() => onToggle(false)}
+                className={`toggle-no px-4 py-1.5 rounded-full border-2 border-gray-200 text-sm font-semibold transition ${active === false ? 'active' : 'text-gray-500 hover:border-red-300'}`}>
+                No
+              </button>
+            </div>
+          </div>
+          {active === true && (
+            <div className="fade-in">
+              <p className="text-sm text-gray-500 mb-2">Califique la calidad del servicio:</p>
+              <div className="flex gap-2 justify-center">
+                {[1,2,3,4,5].map(n => (
+                  <button key={n} type="button" onClick={() => onNota(n)}
+                    className={`btn-likert w-12 h-12 rounded-xl border-2 font-bold text-sm flex flex-col items-center justify-center
+                      ${nota === n ? 'selected' : 'border-gray-200 bg-white text-gray-500'}`}>
+                    <span>{n}</span>
+                    <span style={{ fontSize: '8px', lineHeight: 1 }}>{SERVICE_LABELS[n].split(' ')[0]}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ── Progress Bar ─────────────────────────────────────────
+    function ProgressBar({ step }) {
+      const pct = Math.round((step / TOTAL_STEPS) * 100);
+      return (
+        <div className="w-full bg-gray-100 rounded-full h-2 mb-6">
+          <div className="progress-bar bg-green-500 h-2 rounded-full" style={{ width: pct + '%' }} />
+        </div>
+      );
+    }
+
+    // ── Main App ─────────────────────────────────────────────
+    function App() {
+      const [step, setStep] = useState(0);
+      const [saving, setSaving] = useState(false);
+      const [error, setError]  = useState(null);
+
+      const [form, setForm] = useState({
+        tipo_espacio: '',
+        tiempo_inquilino: '',
+        p1_espacio: null, p2_areas_comunes: null, p3_precio_alquiler: null,
+        p4_areas_verdes: null, p5_mantenimiento: null, p6_seguridad: null,
+        p7_comunicacion: null, p8_satisfaccion_general: null,
+        serv_limpieza: null, serv_limpieza_nota: null,
+        serv_internet: null, serv_internet_nota: null,
+        p9_nps: null,
+        comentarios: '',
+      });
+
+      const set = (key, val) => setForm(f => ({ ...f, [key]: val }));
+
+      const canContinue = () => {
+        if (step === 1) return form.tipo_espacio && form.tiempo_inquilino;
+        if (step === 2) return PREGUNTAS.every(p => form[p.key] !== null);
+        if (step === 3) return form.serv_limpieza !== null && form.serv_internet !== null
+          && (form.serv_limpieza === false || form.serv_limpieza_nota !== null)
+          && (form.serv_internet === false  || form.serv_internet_nota  !== null);
+        if (step === 4) return form.p9_nps !== null;
+        return true;
+      };
+
+      const submit = async () => {
+        setSaving(true);
+        setError(null);
+        const { error: err } = await db.from('encuesta_satisfaccion').insert([{
+          tipo_espacio: form.tipo_espacio,
+          tiempo_inquilino: form.tiempo_inquilino,
+          p1_espacio: form.p1_espacio,
+          p2_areas_comunes: form.p2_areas_comunes,
+          p3_precio_alquiler: form.p3_precio_alquiler,
+          p4_areas_verdes: form.p4_areas_verdes,
+          p5_mantenimiento: form.p5_mantenimiento,
+          p6_seguridad: form.p6_seguridad,
+          p7_comunicacion: form.p7_comunicacion,
+          p8_satisfaccion_general: form.p8_satisfaccion_general,
+          serv_limpieza: form.serv_limpieza,
+          serv_limpieza_nota: form.serv_limpieza ? form.serv_limpieza_nota : null,
+          serv_internet: form.serv_internet,
+          serv_internet_nota: form.serv_internet ? form.serv_internet_nota : null,
+          p9_nps: form.p9_nps,
+          comentarios: form.comentarios || null,
+        }]);
+        setSaving(false);
+        if (err) { setError('Ocurrió un error al enviar. Por favor intente de nuevo.'); return; }
+        setStep(5);
+      };
+
+      return (
+        <div className="max-w-xl mx-auto">
+          {/* Header */}
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-green-100 mb-3">
+              <span className="text-3xl">🌿</span>
+            </div>
+            <h1 className="text-2xl font-bold text-green-900">Parque Tempisque</h1>
+            {step > 0 && step < 5 && (
+              <p className="text-sm text-gray-500 mt-1">Encuesta de Satisfacción de Inquilinos</p>
+            )}
+          </div>
+
+          {step > 0 && step < 5 && <ProgressBar step={step} />}
+
+          <div className="card p-6 fade-in">
+
+            {/* ─── STEP 0: Bienvenida ─── */}
+            {step === 0 && (
+              <div className="text-center py-4">
+                <h2 className="text-xl font-bold text-gray-800 mb-3">¡Tu opinión nos importa!</h2>
+                <p className="text-gray-600 mb-2">Esta encuesta es <strong>breve y anónima</strong>, toma menos de 3 minutos.</p>
+                <p className="text-gray-500 text-sm mb-8">Tu retroalimentación nos ayuda a mejorar Parque Tempisque para todos.</p>
+                <div className="bg-green-50 rounded-xl p-4 mb-8 text-left">
+                  <p className="text-sm text-green-800 font-semibold mb-2">Escala de calificación (preguntas 1–8):</p>
+                  <div className="flex justify-between text-xs text-green-700">
+                    <span>1 = Totalmente en desacuerdo</span>
+                    <span>5 = Totalmente de acuerdo</span>
+                  </div>
+                </div>
+                <button onClick={() => setStep(1)}
+                  className="w-full py-3 rounded-xl bg-green-600 text-white font-bold text-lg hover:bg-green-700 transition">
+                  Comenzar encuesta →
+                </button>
+              </div>
+            )}
+
+            {/* ─── STEP 1: Información General ─── */}
+            {step === 1 && (
+              <div className="fade-in">
+                <h2 className="text-lg font-bold text-gray-800 mb-1">📋 Información General</h2>
+                <p className="text-sm text-gray-500 mb-5">Cuéntenos un poco sobre su espacio.</p>
+
+                <label className="block mb-4">
+                  <span className="text-sm font-semibold text-gray-700 block mb-1">Tipo de espacio rentado</span>
+                  <select value={form.tipo_espacio} onChange={e => set('tipo_espacio', e.target.value)}
+                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-700 focus:outline-none focus:border-green-500 transition">
+                    <option value="">-- Seleccione --</option>
+                    <option>Oficina</option>
+                    <option>Bodega</option>
+                    <option>Local Comercial</option>
+                    <option>Otro</option>
+                  </select>
+                </label>
+
+                <label className="block mb-6">
+                  <span className="text-sm font-semibold text-gray-700 block mb-1">Tiempo como inquilino en Parque Tempisque</span>
+                  <select value={form.tiempo_inquilino} onChange={e => set('tiempo_inquilino', e.target.value)}
+                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-700 focus:outline-none focus:border-green-500 transition">
+                    <option value="">-- Seleccione --</option>
+                    <option>Menos de 6 meses</option>
+                    <option>6 meses – 1 año</option>
+                    <option>1 – 2 años</option>
+                    <option>Más de 2 años</option>
+                  </select>
+                </label>
+
+                <div className="flex gap-3">
+                  <button onClick={() => setStep(0)} className="flex-1 py-3 rounded-xl border-2 border-gray-200 text-gray-600 font-semibold hover:border-gray-300 transition">← Atrás</button>
+                  <button onClick={() => setStep(2)} disabled={!canContinue()}
+                    className="flex-1 py-3 rounded-xl bg-green-600 text-white font-bold hover:bg-green-700 transition disabled:opacity-40 disabled:cursor-not-allowed">
+                    Continuar →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ─── STEP 2: Preguntas de Satisfacción ─── */}
+            {step === 2 && (
+              <div className="fade-in">
+                <h2 className="text-lg font-bold text-gray-800 mb-1">⭐ Preguntas de Satisfacción</h2>
+                <p className="text-sm text-gray-500 mb-5">Evalúe cada afirmación del 1 (en desacuerdo) al 5 (de acuerdo).</p>
+
+                {PREGUNTAS.map((p, i) => (
+                  <div key={p.key} className="mb-6 pb-5 border-b border-gray-100 last:border-0">
+                    <p className="text-sm font-semibold text-gray-700 mb-1">
+                      <span className="text-green-600 font-bold">{i + 1}.</span> {p.label}
+                    </p>
+                    <LikertGroup value={form[p.key]} onChange={v => set(p.key, v)} />
+                  </div>
+                ))}
+
+                <div className="flex gap-3 mt-4">
+                  <button onClick={() => setStep(1)} className="flex-1 py-3 rounded-xl border-2 border-gray-200 text-gray-600 font-semibold hover:border-gray-300 transition">← Atrás</button>
+                  <button onClick={() => setStep(3)} disabled={!canContinue()}
+                    className="flex-1 py-3 rounded-xl bg-green-600 text-white font-bold hover:bg-green-700 transition disabled:opacity-40 disabled:cursor-not-allowed">
+                    Continuar →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ─── STEP 3: Servicios ─── */}
+            {step === 3 && (
+              <div className="fade-in">
+                <h2 className="text-lg font-bold text-gray-800 mb-1">📦 Servicios Contratados</h2>
+                <p className="text-sm text-gray-500 mb-5">Indique si adquiere cada servicio y califique su calidad.</p>
+
+                <ServiceBlock
+                  label="🧹 Servicio de Limpieza"
+                  active={form.serv_limpieza}
+                  onToggle={v => set('serv_limpieza', v)}
+                  nota={form.serv_limpieza_nota}
+                  onNota={v => set('serv_limpieza_nota', v)}
+                />
+                <ServiceBlock
+                  label="📶 Internet y Wi-Fi"
+                  active={form.serv_internet}
+                  onToggle={v => set('serv_internet', v)}
+                  nota={form.serv_internet_nota}
+                  onNota={v => set('serv_internet_nota', v)}
+                />
+
+                <div className="flex gap-3 mt-4">
+                  <button onClick={() => setStep(2)} className="flex-1 py-3 rounded-xl border-2 border-gray-200 text-gray-600 font-semibold hover:border-gray-300 transition">← Atrás</button>
+                  <button onClick={() => setStep(4)} disabled={!canContinue()}
+                    className="flex-1 py-3 rounded-xl bg-green-600 text-white font-bold hover:bg-green-700 transition disabled:opacity-40 disabled:cursor-not-allowed">
+                    Continuar →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ─── STEP 4: NPS + Comentarios ─── */}
+            {step === 4 && (
+              <div className="fade-in">
+                <h2 className="text-lg font-bold text-gray-800 mb-1">💬 Recomendación y Comentarios</h2>
+
+                <div className="mb-6">
+                  <p className="text-sm font-semibold text-gray-700 mb-3">
+                    📢 ¿Qué tan probable es que recomiende Parque Tempisque a colegas o conocidos como lugar para instalar su negocio?
+                  </p>
+                  <p className="text-xs text-gray-400 mb-3 text-center">0 = Definitivamente NO &nbsp;·&nbsp; 10 = Definitivamente SÍ</p>
+                  <div className="flex flex-wrap gap-1.5 justify-center">
+                    {[0,1,2,3,4,5,6,7,8,9,10].map(n => {
+                      const colors = ['#ef4444','#f97316','#f97316','#eab308','#eab308','#eab308','#eab308','#84cc16','#84cc16','#16a34a','#16a34a'];
+                      return (
+                        <button key={n} type="button" onClick={() => set('p9_nps', n)}
+                          className={`btn-nps w-10 h-10 rounded-xl border-2 font-bold text-sm
+                            ${form.p9_nps === n ? 'selected border-transparent' : 'border-gray-200 bg-white text-gray-600'}`}
+                          style={form.p9_nps === n ? { background: colors[n] } : {}}>
+                          {n}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="mb-6">
+                  <label className="text-sm font-semibold text-gray-700 block mb-2">✏️ Comentarios adicionales (opcional)</label>
+                  <textarea
+                    rows={3}
+                    value={form.comentarios}
+                    onChange={e => set('comentarios', e.target.value)}
+                    placeholder="¿Algún comentario, sugerencia o consulta?"
+                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-700 focus:outline-none focus:border-green-500 transition resize-none"
+                  />
+                </div>
+
+                {error && <p className="text-red-500 text-sm mb-3 text-center">{error}</p>}
+
+                <div className="flex gap-3">
+                  <button onClick={() => setStep(3)} disabled={saving} className="flex-1 py-3 rounded-xl border-2 border-gray-200 text-gray-600 font-semibold hover:border-gray-300 transition">← Atrás</button>
+                  <button onClick={submit} disabled={!canContinue() || saving}
+                    className="flex-1 py-3 rounded-xl bg-green-600 text-white font-bold hover:bg-green-700 transition disabled:opacity-40 disabled:cursor-not-allowed">
+                    {saving ? 'Enviando…' : 'Enviar respuesta ✓'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ─── STEP 5: Gracias ─── */}
+            {step === 5 && (
+              <div className="text-center py-8 fade-in">
+                <div className="text-6xl mb-4">🌿</div>
+                <h2 className="text-2xl font-bold text-green-800 mb-3">¡Muchas gracias!</h2>
+                <p className="text-gray-600 mb-2">Tu opinión ha sido registrada correctamente.</p>
+                <p className="text-gray-500 text-sm">Tu retroalimentación hace que Parque Tempisque sea un mejor lugar para todos.</p>
+              </div>
+            )}
+
+          </div>
+
+          <p className="text-center text-xs text-gray-400 mt-6">Encuesta anónima · Parque Tempisque · {new Date().getFullYear()}</p>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
