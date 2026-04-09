@@ -53,9 +53,9 @@
       { key: 'p2_areas_comunes',        label: '🚪 Las áreas internas comunes (pasillos, lobby, baños y parqueo) se mantienen limpias y accesibles.' },
       { key: 'p3_precio_alquiler',      label: '💰 El precio del alquiler es justo en relación con las instalaciones.' },
       { key: 'p4_areas_verdes',         label: '🌿 Las áreas externas comunes se mantienen limpias, ordenadas y con buen aspecto.' },
-      { key: 'p6_seguridad',            label: '🔒 Las medidas de seguridad del centro son adecuadas.' },
+      { key: 'p6_seguridad',            label: '🔒 Las medidas de seguridad del edificio Centro son adecuadas.' },
       { key: 'p7_comunicacion',         label: '📞 La comunicación con el equipo administrativo es clara, oportuna y profesional.' },
-      { key: 'p8_satisfaccion_general', label: '⭐ En general, estoy satisfecho/a con mi experiencia como inquilino en Parque Tempisque.' },
+      { key: 'p8_satisfaccion_general', label: '⭐ En general, estoy satisfecho/a con mi experiencia como inquilino del edificio Centro.' },
     ];
 
     const TOTAL_STEPS = 5; // 1=Info 2=Satisfaccion 3=Servicios 4=NPS 5=Gracias
@@ -300,7 +300,7 @@
                   onNota={v => set('serv_limpieza_nota', v)}
                 />
                 <ServiceBlock
-                  label="📶 Internet y Wi-Fi"
+                  label="🏢 Servicios de mantenimiento varios"
                   active={form.serv_internet}
                   onToggle={v => set('serv_internet', v)}
                   nota={form.serv_internet_nota}
