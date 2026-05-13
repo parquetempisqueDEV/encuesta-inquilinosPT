@@ -368,7 +368,7 @@
                           <td className="text-center font-bold" style={{ color: r.p9_nps >= 9 ? '#16a34a' : r.p9_nps >= 7 ? '#92400e' : r.p9_nps !== null ? '#dc2626' : '#9ca3af' }}>
                             {r.p9_nps !== null ? r.p9_nps : '–'}
                           </td>
-                          <td className="text-xs max-w-xs truncate text-gray-500" title={r.comentarios || ''}>{r.comentarios || '–'}</td>
+                          <td className="text-xs text-gray-500 whitespace-normal break-words align-top" style={{minWidth:'250px',maxWidth:'400px'}} title={r.comentarios || ''}>{r.comentarios || '–'}</td>
                         </tr>
                       ))}
                     </tbody>
