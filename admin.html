@@ -31,6 +31,23 @@
     .star { color: #eab308; }
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-thumb { background: #bbf7d0; border-radius: 3px; }
+
+    /* ─── Estilos para impresión / exportar PDF ─── */
+    @media print {
+      @page { size: A4 landscape; margin: 12mm; }
+      body { background: white !important; }
+      .no-print { display: none !important; }
+      .print-only { display: block !important; }
+      .card { box-shadow: none !important; border: 1px solid #e5e7eb; border-radius: 0 !important; }
+      .card.overflow-auto { overflow: visible !important; }
+      table { font-size: 9px !important; page-break-inside: auto; }
+      thead { display: table-header-group; }
+      tr { page-break-inside: avoid; }
+      th { background: #f0fdf4 !important; padding: 6px 4px !important; font-size: 8px !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      td { padding: 5px 4px !important; font-size: 9px !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      td[style*="color"] { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+    .print-only { display: none; }
   </style>
 </head>
 <body class="min-h-screen">
@@ -341,7 +358,34 @@
             )}
 
             {tab === 'respuestas' && (
-              <div className="fade-in">
+              <div className="fade-in" id="respuestas-export">
+                <div className="flex justify-between items-center mb-4 no-print">
+                  <h3 className="font-bold text-gray-700">Tabla de respuestas</h3>
+                  <button
+                    onClick={() => {
+                      document.title = `Encuesta_Inquilinos_PT_${new Date().toISOString().slice(0,10)}`;
+                      window.print();
+                    }}
+                    className="bg-green-700 hover:bg-green-800 text-white text-sm font-semibold px-4 py-2 rounded-lg shadow transition flex items-center gap-2"
+                  >
+                    <span>📄</span> Exportar PDF
+                  </button>
+                </div>
+
+                {/* Encabezado visible solo al imprimir */}
+                <div className="print-only mb-4" style={{borderBottom:'2px solid #1a4a2e', paddingBottom:'8px', marginBottom:'12px'}}>
+                  <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end'}}>
+                    <div>
+                      <h1 style={{fontSize:'16px', fontWeight:'800', color:'#1a4a2e', margin:0}}>Parque Tempisque</h1>
+                      <p style={{fontSize:'11px', color:'#374151', margin:'2px 0 0 0'}}>Encuesta de Satisfacción de Inquilinos – Respuestas completas</p>
+                    </div>
+                    <div style={{textAlign:'right', fontSize:'9px', color:'#6b7280'}}>
+                      <p style={{margin:0}}>Generado: {new Date().toLocaleDateString('es-CR', {day:'2-digit', month:'long', year:'numeric'})}</p>
+                      <p style={{margin:'2px 0 0 0'}}>Total de respuestas: {n}</p>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="card overflow-auto">
                   <table>
                     <thead>
